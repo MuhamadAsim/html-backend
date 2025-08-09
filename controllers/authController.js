@@ -15,7 +15,7 @@ export const login = async (req, res) => {
 
 
   if (email === USER_ID && password === PASSWORD) {
-    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: '45d' });
+    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: '60d' });
     return res.status(200).json({ token });
   }
 
