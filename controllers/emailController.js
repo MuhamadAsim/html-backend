@@ -1,6 +1,7 @@
 import Recipient from "../models/Recipient.js";
 import EmailEvent from "../models/EmailEvent.js";
 import sgMail from "@sendgrid/mail";
+import juice from 'juice';
 
 
 
@@ -78,49 +79,72 @@ export const getRecipients = async (req, res) => {
 
 
 
+
+
+
+
+
 export const sendEmailCampaign = async (req, res) => {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
+  function preserveSpaces(html) {
+  if (!html) return html;
+  const withNbsp = html.replace(/ {2,}/g, spaces => spaces.split('').map(() => '&nbsp;').join(''));
+  return `<div style="white-space: pre-wrap;">${withNbsp}</div>`;
+}
 
   try {
     let { subject, html } = req.body;
-    if (!html || typeof html !== "string") {
-      return res.status(400).json({ message: "No email content provided" });
+
+    if (!html || typeof html !== 'string') {
+      return res.status(400).json({ message: 'No email content provided' });
     }
 
-    if (!subject || typeof subject !== "string" || !subject.trim()) {
-      subject = "Advertisement";
+    if (!subject || typeof subject !== 'string' || !subject.trim()) {
+      subject = 'Advertisement';
     }
 
+    // ✅ Preserve spaces before inline CSS
+    const safeHtml = preserveSpaces(html);
 
-    const recipients = await Recipient.find().select("email");
+    // Fetch all recipient emails
+    const recipients = await Recipient.find().select('email');
     const emails = recipients.map(r => r.email);
 
     if (emails.length === 0) {
-      return res.status(400).json({ message: "No recipients found" });
+      return res.status(400).json({ message: 'No recipients found' });
     }
+
+    // Convert CSS/classes to inline styles
+    const htmlWithInlineStyles = juice(safeHtml);
 
     let sentCount = 0;
     for (const email of emails) {
       await sgMail.send({
         to: email,
-        from: process.env.FROM_EMAIL,
-        subject: subject || "Advertisement",
-        html
+        from: {
+          email: process.env.FROM_EMAIL,
+          name: 'Auditatlas',
+        },
+        subject,
+        html: htmlWithInlineStyles,
       });
       sentCount++;
     }
 
     res.status(200).json({
-      message: "Emails sent successfully",
-      recipients: sentCount
+      message: 'Emails sent successfully',
+      recipients: sentCount,
     });
   } catch (error) {
-
-    console.error("Error sending email campaign:", error.response?.body || error);
-    res.status(500).json({ message: "Failed to send emails" });
+    console.error('Error sending email campaign:', error.response?.body || error);
+    res.status(500).json({ message: 'Failed to send emails' });
   }
 };
+
+
+
+
+
 
 
 
