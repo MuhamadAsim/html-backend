@@ -144,6 +144,61 @@ export const sendEmailCampaign = async (req, res) => {
 
 
 
+export const sendSingleEmail = async (req, res) => {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+  // helper for preserving spaces
+  function preserveSpaces(html) {
+    if (!html) return html;
+    const withNbsp = html.replace(/ {2,}/g, spaces =>
+      spaces.split("").map(() => "&nbsp;").join("")
+    );
+    return `<div style="white-space: pre-wrap;">${withNbsp}</div>`;
+  }
+
+  try {
+    let { subject, html, recipient } = req.body;
+
+    if (!recipient || typeof recipient !== "string" || !recipient.includes("@")) {
+      return res.status(400).json({ message: "Invalid or missing recipient email" });
+    }
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No email content provided" });
+    }
+
+    if (!subject || typeof subject !== "string" || !subject.trim()) {
+      subject = "Advertisement";
+    }
+
+    // ✅ Preserve spaces before inline CSS
+    const safeHtml = preserveSpaces(html);
+
+    // Convert CSS/classes to inline styles
+    const htmlWithInlineStyles = juice(safeHtml);
+
+    // Send the email
+    await sgMail.send({
+      to: recipient,
+      from: {
+        email: process.env.FROM_EMAIL,
+        name: "Auditatlas",
+      },
+      subject,
+      html: htmlWithInlineStyles,
+    });
+
+    res.status(200).json({
+      message: `Email sent successfully to ${recipient}`,
+    });
+  } catch (error) {
+    console.error("Error sending single email:", error.response?.body || error);
+    res.status(500).json({ message: "Failed to send email" });
+  }
+};
+
+
+
 
 
 
